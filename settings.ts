@@ -84,6 +84,20 @@ export class AutoLinkTitleSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Enhance inside code blocks")
+      .setDesc(
+        "When disabled, pasting a URL inside a fenced or inline code block leaves it as raw text instead of wrapping it in a markdown link."
+      )
+      .addToggle((val) =>
+        val
+          .setValue(this.plugin.settings.enhanceInsideCodeBlocks)
+          .onChange(async (value) => {
+            this.plugin.settings.enhanceInsideCodeBlocks = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
       .setName("Maximum title length")
       .setDesc("Set the maximum length of the title. Set to 0 to disable.")
       .addText((val) =>
@@ -123,20 +137,6 @@ export class AutoLinkTitleSettingTab extends PluginSettingTab {
           .setPlaceholder("localhost, tiktok.com")
           .onChange(async (value) => {
             this.plugin.settings.websiteBlacklist = value;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Enhance inside code blocks")
-      .setDesc(
-        "When disabled, pasting a URL inside a fenced or inline code block leaves it as raw text instead of wrapping it in a markdown link."
-      )
-      .addToggle((val) =>
-        val
-          .setValue(this.plugin.settings.enhanceInsideCodeBlocks)
-          .onChange(async (value) => {
-            this.plugin.settings.enhanceInsideCodeBlocks = value;
             await this.plugin.saveSettings();
           })
       );
