@@ -3,7 +3,7 @@
  * Plugin settings interface, defaults, and settings tab UI.
  * Handles all user-configurable options for Auto Link Title.
  */
-import { type App, Notice, PluginSettingTab, Setting } from "obsidian";
+import { type App, PluginSettingTab, SecretComponent, Setting } from "obsidian";
 import { i18n } from "./lang/i18n";
 import type AutoLinkTitle from "./main";
 
@@ -22,7 +22,7 @@ export interface AutoLinkTitleSettings {
 	websiteBlacklist: string;
 	maximumTitleLength: number;
 	useNewScraper: boolean;
-	linkPreviewApiKey: string;
+	linkPreviewSecretId: string;
 	useBetterPasteId: boolean;
 	ignoreCodeBlocks: boolean;
 	useTwitterProxy: boolean;
@@ -46,7 +46,7 @@ export const DEFAULT_SETTINGS: AutoLinkTitleSettings = {
 	websiteBlacklist: "",
 	maximumTitleLength: 0,
 	useNewScraper: false,
-	linkPreviewApiKey: "",
+	linkPreviewSecretId: "",
 	useBetterPasteId: false,
 	ignoreCodeBlocks: true,
 	useTwitterProxy: true,
@@ -155,17 +155,13 @@ export class AutoLinkTitleSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName(i18n.settings.apiKey.name)
 			.setDesc(i18n.settings.apiKey.desc)
-			.addText((text) =>
-				text.setValue(this.plugin.settings.linkPreviewApiKey || "").onChange(async (value) => {
-					const trimmedValue = value.trim();
-					if (trimmedValue.length > 0 && trimmedValue.length !== 32) {
-						new Notice(i18n.notices.apiKeyInvalid);
-						this.plugin.settings.linkPreviewApiKey = "";
-					} else {
-						this.plugin.settings.linkPreviewApiKey = trimmedValue;
-					}
-					await this.plugin.saveSettings();
-				}),
+			.addComponent((el) =>
+				new SecretComponent(this.app, el)
+					.setValue(this.plugin.settings.linkPreviewSecretId)
+					.onChange(async (value) => {
+						this.plugin.settings.linkPreviewSecretId = value;
+						await this.plugin.saveSettings();
+					}),
 			);
 
 		new Setting(containerEl)

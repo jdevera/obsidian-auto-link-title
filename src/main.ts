@@ -284,7 +284,10 @@ export default class AutoLinkTitle extends Plugin {
 		editor.replaceSelection(`[${pasteId}](${url})`);
 
 		// Fetch title from site, replace Fetching Title with actual title
-		const title = await fetchUrlTitle(url, this.settings);
+		const linkPreviewApiKey = this.settings.linkPreviewSecretId
+			? (this.app.secretStorage.getSecret(this.settings.linkPreviewSecretId) ?? "")
+			: "";
+		const title = await fetchUrlTitle(url, { ...this.settings, linkPreviewApiKey });
 		const escapedTitle = escapeMarkdown(title);
 		const shortenedTitle = shortTitle(escapedTitle, this.settings.maximumTitleLength);
 
@@ -308,7 +311,22 @@ export default class AutoLinkTitle extends Plugin {
 
 	/** Loads plugin settings from Obsidian's data store */
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const loaded = (await this.loadData()) as
+			| (AutoLinkTitleSettings & { linkPreviewApiKey?: string })
+			| null;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
+
+		// Migrate the legacy plaintext `linkPreviewApiKey` setting into Obsidian's
+		// SecretStorage. The key moves out of data.json and the setting now holds
+		// the SecretStorage id that the user can later swap via SecretComponent.
+		const legacyKey = loaded?.linkPreviewApiKey;
+		if (legacyKey && !this.settings.linkPreviewSecretId) {
+			const migratedId = "linkpreview-api-key";
+			this.app.secretStorage.setSecret(migratedId, legacyKey);
+			this.settings.linkPreviewSecretId = migratedId;
+			(this.settings as { linkPreviewApiKey?: string }).linkPreviewApiKey = undefined;
+			await this.saveSettings();
+		}
 	}
 
 	/** Saves plugin settings to Obsidian's data store */

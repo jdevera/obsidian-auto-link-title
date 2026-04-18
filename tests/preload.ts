@@ -39,5 +39,16 @@ mock.module("obsidian", () => ({
 		addTextArea(_cb: any) {
 			return this;
 		}
+		addComponent(_cb: any) {
+			return this;
+		}
+	},
+	SecretComponent: class SecretComponent {
+		setValue(_value: string) {
+			return this;
+		}
+		onChange(_cb: any) {
+			return this;
+		}
 	},
 }));
