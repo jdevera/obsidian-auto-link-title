@@ -1,7 +1,7 @@
 {
   "id": "obsidian-auto-link-title",
   "name": "Auto Link Title",
-  "version": "1.5.7",
+  "version": "1.6.0",
   "minAppVersion": "1.11.4",
   "description": "This plugin automatically fetches the titles of links from the web",
   "author": "Matt Furden",
