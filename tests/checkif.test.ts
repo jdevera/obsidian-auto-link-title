@@ -78,6 +78,22 @@ describe("CheckIf.isImage", () => {
 	test("returns false for URL without extension", () => {
 		expect(CheckIf.isImage("https://example.com/path")).toBe(false);
 	});
+
+	test("returns false for bare .ai domain (TLD, not file)", () => {
+		expect(CheckIf.isImage("https://openclaw.ai")).toBe(false);
+	});
+
+	test("returns false for bare .ai domain with trailing slash", () => {
+		expect(CheckIf.isImage("https://openclaw.ai/")).toBe(false);
+	});
+
+	test("returns true for .ai file in path on .ai domain", () => {
+		expect(CheckIf.isImage("https://openclaw.ai/logo.ai")).toBe(true);
+	});
+
+	test("returns true for .ai file in path on .com domain", () => {
+		expect(CheckIf.isImage("https://example.com/logo.ai")).toBe(true);
+	});
 });
 
 describe("CheckIf.isLinkedUrl", () => {

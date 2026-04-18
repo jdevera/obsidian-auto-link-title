@@ -72,13 +72,21 @@ export class CheckIf {
 	}
 
 	/**
-	 * Checks if the text is an image URL
+	 * Checks if the text is an image URL.
+	 *
+	 * The regex is tested against the URL's pathname, not the full URL, so
+	 * a bare domain on an image-like TLD (e.g. https://openclaw.ai for the
+	 * ".ai" Adobe Illustrator extension) is not misclassified as an image.
 	 * @param text - Text to check
-	 * @returns true if URL has an image extension
+	 * @returns true if URL has an image extension in its path
 	 */
 	public static isImage(text: string): boolean {
 		const imageRegex = new RegExp(DEFAULT_SETTINGS.imageRegex);
-		return imageRegex.test(text);
+		try {
+			return imageRegex.test(new URL(text).pathname);
+		} catch {
+			return imageRegex.test(text);
+		}
 	}
 
 	/**
