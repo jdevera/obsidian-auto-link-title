@@ -2,8 +2,6 @@
  * @fileoverview
  * Common utilities shared between HTTP and Electron scrapers.
  */
-import { CheckIf } from "../checkif";
-
 /**
  * Checks if a string is blank (undefined, null, or empty)
  * @param text - Text to check
@@ -45,31 +43,6 @@ export function getUrlFinalSegment(url: string): string {
 	} catch (_) {
 		return "File";
 	}
-}
-
-/**
- * Prepares URL and headers for Twitter/X scraping via proxy
- * @param url - Original URL
- * @param useTwitterProxy - Whether to use Twitter proxy (fxtwitter/fixupx)
- * @returns Object with scrape URL and headers
- */
-export function prepareTwitterScrape(
-	url: string,
-	useTwitterProxy: boolean,
-): {
-	scrapeUrl: string;
-	headers: Record<string, string>;
-} {
-	const isTwitter = CheckIf.isTwitterUrl(url);
-	const scrapeUrl = isTwitter && useTwitterProxy ? CheckIf.toTwitterProxyUrl(url) : url;
-
-	const headers: Record<string, string> = {};
-	if (isTwitter && useTwitterProxy) {
-		// Use dedicated User-Agent for link preview (matches FxEmbed bot detection patterns)
-		headers["User-Agent"] = "ObsidianLinkPreview/1.0 (+https://obsidian.md)";
-	}
-
-	return { scrapeUrl, headers };
 }
 
 /**

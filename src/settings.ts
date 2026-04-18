@@ -25,11 +25,10 @@ export interface AutoLinkTitleSettings {
 	linkPreviewSecretId: string;
 	useBetterPasteId: boolean;
 	ignoreCodeBlocks: boolean;
-	useTwitterProxy: boolean;
-	/** Ordered list of registered title handler ids (highest priority first) */
-	titleHandlerOrder: string[];
-	/** Title handler ids the user has explicitly disabled */
-	titleHandlerDisabled: string[];
+	/** Ordered list of registered title provider ids (highest priority first) */
+	titleProviderOrder: string[];
+	/** Title provider ids the user has explicitly disabled */
+	titleProviderDisabled: string[];
 }
 
 /**
@@ -53,9 +52,8 @@ export const DEFAULT_SETTINGS: AutoLinkTitleSettings = {
 	linkPreviewSecretId: "",
 	useBetterPasteId: false,
 	ignoreCodeBlocks: true,
-	useTwitterProxy: true,
-	titleHandlerOrder: [],
-	titleHandlerDisabled: [],
+	titleProviderOrder: [],
+	titleProviderDisabled: [],
 };
 
 /**
@@ -180,62 +178,52 @@ export class AutoLinkTitleSettingTab extends PluginSettingTab {
 				}),
 			);
 
-		new Setting(containerEl)
-			.setName(i18n.settings.useTwitterProxy.name)
-			.setDesc(i18n.settings.useTwitterProxy.desc)
-			.addToggle((val) =>
-				val.setValue(this.plugin.settings.useTwitterProxy).onChange(async (value) => {
-					this.plugin.settings.useTwitterProxy = value;
-					await this.plugin.saveSettings();
-				}),
-			);
-
-		this.renderTitleHandlers(containerEl);
+		this.renderTitleProviders(containerEl);
 	}
 
 	/**
-	 * Renders the title handlers section: one row per ordered handler id with
+	 * Renders the title providers section: one row per ordered provider id with
 	 * enable toggle and move up/down buttons. Orphan ids (in settings but not
 	 * currently registered) are shown greyed and kept in place, since the
 	 * sweep at onLayoutReady has already removed ids nobody claims.
 	 */
-	private renderTitleHandlers(containerEl: HTMLElement): void {
-		new Setting(containerEl).setName(i18n.settings.titleHandlers.heading).setHeading();
+	private renderTitleProviders(containerEl: HTMLElement): void {
+		new Setting(containerEl).setName(i18n.settings.titleProviders.heading).setHeading();
 
 		const desc = containerEl.createEl("div", { cls: "setting-item-description" });
-		desc.setText(i18n.settings.titleHandlers.desc);
+		desc.setText(i18n.settings.titleProviders.desc);
 
-		const order = this.plugin.settings.titleHandlerOrder;
+		const order = this.plugin.settings.titleProviderOrder;
 		if (order.length === 0) {
 			const empty = containerEl.createEl("div", { cls: "setting-item-description" });
-			empty.setText(i18n.settings.titleHandlers.empty);
+			empty.setText(i18n.settings.titleProviders.empty);
 			return;
 		}
 
-		const disabled = new Set(this.plugin.settings.titleHandlerDisabled);
+		const disabled = new Set(this.plugin.settings.titleProviderDisabled);
 		for (let i = 0; i < order.length; i++) {
 			const id = order[i];
-			const handler = this.plugin.titleHandlers.get(id);
-			const label = handler?.label ?? id;
-			const isRegistered = handler !== undefined;
+			const provider = this.plugin.titleProviders.get(id);
+			const label = provider?.label ?? id;
+			const isRegistered = provider !== undefined;
 
 			const row = new Setting(containerEl).setName(label);
-			if (!isRegistered) {
-				row.setDesc(`${id} (${i18n.settings.titleHandlers.notLoaded})`);
-				row.settingEl.addClass("mod-muted");
-			} else if (handler?.label && handler.label !== id) {
-				row.setDesc(id);
-			}
+			const descParts: string[] = [];
+			if (provider?.label && provider.label !== id) descParts.push(id);
+			if (provider?.origin) descParts.push(`from ${provider.origin}`);
+			if (!isRegistered) descParts.push(`(${i18n.settings.titleProviders.notLoaded})`);
+			if (descParts.length > 0) row.setDesc(descParts.join(" · "));
+			if (!isRegistered) row.settingEl.addClass("mod-muted");
 
 			row.addToggle((t) =>
 				t.setValue(!disabled.has(id)).onChange(async (enabled) => {
-					const next = new Set(this.plugin.settings.titleHandlerDisabled);
+					const next = new Set(this.plugin.settings.titleProviderDisabled);
 					if (enabled) {
 						next.delete(id);
 					} else {
 						next.add(id);
 					}
-					this.plugin.settings.titleHandlerDisabled = Array.from(next);
+					this.plugin.settings.titleProviderDisabled = Array.from(next);
 					await this.plugin.saveSettings();
 				}),
 			);
@@ -244,30 +232,30 @@ export class AutoLinkTitleSettingTab extends PluginSettingTab {
 			row.addExtraButton((btn) =>
 				btn
 					.setIcon("chevron-up")
-					.setTooltip(i18n.settings.titleHandlers.moveUp)
+					.setTooltip(i18n.settings.titleProviders.moveUp)
 					.setDisabled(currentIndex === 0)
 					.onClick(async () => {
-						await this.moveHandler(currentIndex, currentIndex - 1);
+						await this.moveProvider(currentIndex, currentIndex - 1);
 					}),
 			);
 			row.addExtraButton((btn) =>
 				btn
 					.setIcon("chevron-down")
-					.setTooltip(i18n.settings.titleHandlers.moveDown)
+					.setTooltip(i18n.settings.titleProviders.moveDown)
 					.setDisabled(currentIndex === order.length - 1)
 					.onClick(async () => {
-						await this.moveHandler(currentIndex, currentIndex + 1);
+						await this.moveProvider(currentIndex, currentIndex + 1);
 					}),
 			);
 		}
 	}
 
-	/** Swaps two ids in the handler order list and re-renders the settings tab */
-	private async moveHandler(fromIndex: number, toIndex: number): Promise<void> {
-		const order = [...this.plugin.settings.titleHandlerOrder];
+	/** Swaps two ids in the provider order list and re-renders the settings tab */
+	private async moveProvider(fromIndex: number, toIndex: number): Promise<void> {
+		const order = [...this.plugin.settings.titleProviderOrder];
 		const [id] = order.splice(fromIndex, 1);
 		order.splice(toIndex, 0, id);
-		this.plugin.settings.titleHandlerOrder = order;
+		this.plugin.settings.titleProviderOrder = order;
 		await this.plugin.saveSettings();
 		this.display();
 	}

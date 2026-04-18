@@ -11,7 +11,6 @@ import getPageTitle from "./scraper/http";
 export interface TitleFetcherSettings {
 	linkPreviewApiKey: string;
 	useNewScraper: boolean;
-	useTwitterProxy: boolean;
 }
 
 /**
@@ -76,9 +75,9 @@ export async function fetchUrlTitle(url: string, settings: TitleFetcherSettings)
 
 		// Fall back to scraper
 		if (settings.useNewScraper) {
-			title = await getPageTitle(url, settings.useTwitterProxy);
+			title = await getPageTitle(url);
 		} else {
-			title = await getElectronPageTitle(url, settings.useTwitterProxy);
+			title = await getElectronPageTitle(url);
 		}
 
 		title = title.replace(/(\r\n|\n|\r)/gm, "").trim() || i18n.notices.titleUnavailable;

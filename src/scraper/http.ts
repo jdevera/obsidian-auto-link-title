@@ -5,26 +5,16 @@
  */
 import { requestUrl } from "obsidian";
 
-import {
-	blank,
-	getOgTitle,
-	getUrlFinalSegment,
-	normalizeUrl,
-	notBlank,
-	prepareTwitterScrape,
-} from "./common";
+import { blank, getOgTitle, getUrlFinalSegment, normalizeUrl, notBlank } from "./common";
 
 /**
  * Scrapes the title from a given URL using HTTP request
  * @param url - URL to scrape
- * @param useTwitterProxy - Whether to use Twitter proxy for scraping
  * @returns Page title, URL as fallback, or empty string on error
  */
-async function scrape(url: string, useTwitterProxy: boolean): Promise<string> {
+async function scrape(url: string): Promise<string> {
 	try {
-		const { scrapeUrl, headers } = prepareTwitterScrape(url, useTwitterProxy);
-
-		const response = await requestUrl({ url: scrapeUrl, headers });
+		const response = await requestUrl({ url });
 		const contentType = response.headers["content-type"];
 		if (!contentType?.includes("text/html")) return getUrlFinalSegment(url);
 		const html = response.text;
@@ -60,11 +50,10 @@ async function scrape(url: string, useTwitterProxy: boolean): Promise<string> {
 /**
  * Fetches the page title for a given URL using HTTP request
  * @param url - URL to fetch title from (http/https prefix added if missing)
- * @param useTwitterProxy - Whether to use Twitter proxy for scraping
  * @returns Page title or empty string on error
  */
-export default async function getPageTitle(url: string, useTwitterProxy: boolean): Promise<string> {
+export default async function getPageTitle(url: string): Promise<string> {
 	url = normalizeUrl(url);
 
-	return scrape(url, useTwitterProxy);
+	return scrape(url);
 }

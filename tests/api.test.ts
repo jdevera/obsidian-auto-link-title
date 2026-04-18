@@ -2,41 +2,41 @@
  * @fileoverview Tests for the title handler API helpers.
  */
 import { describe, expect, test } from "bun:test";
-import { isValidHandlerId, withTimeout } from "../src/api";
+import { isValidProviderId, withTimeout } from "../src/api";
 
-describe("isValidHandlerId", () => {
+describe("isValidProviderId", () => {
 	test("accepts a single lowercase word", () => {
-		expect(isValidHandlerId("todoist")).toBe(true);
+		expect(isValidProviderId("todoist")).toBe(true);
 	});
 
 	test("accepts digits", () => {
-		expect(isValidHandlerId("abc123")).toBe(true);
+		expect(isValidProviderId("abc123")).toBe(true);
 	});
 
 	test("accepts dashes between segments", () => {
-		expect(isValidHandlerId("google-docs")).toBe(true);
-		expect(isValidHandlerId("abc-123-def")).toBe(true);
+		expect(isValidProviderId("google-docs")).toBe(true);
+		expect(isValidProviderId("abc-123-def")).toBe(true);
 	});
 
 	test("rejects uppercase", () => {
-		expect(isValidHandlerId("Todoist")).toBe(false);
+		expect(isValidProviderId("Todoist")).toBe(false);
 	});
 
 	test("rejects underscores", () => {
-		expect(isValidHandlerId("google_docs")).toBe(false);
+		expect(isValidProviderId("google_docs")).toBe(false);
 	});
 
 	test("rejects leading or trailing dash", () => {
-		expect(isValidHandlerId("-todoist")).toBe(false);
-		expect(isValidHandlerId("todoist-")).toBe(false);
+		expect(isValidProviderId("-todoist")).toBe(false);
+		expect(isValidProviderId("todoist-")).toBe(false);
 	});
 
 	test("rejects consecutive dashes", () => {
-		expect(isValidHandlerId("google--docs")).toBe(false);
+		expect(isValidProviderId("google--docs")).toBe(false);
 	});
 
 	test("rejects empty string", () => {
-		expect(isValidHandlerId("")).toBe(false);
+		expect(isValidProviderId("")).toBe(false);
 	});
 });
 

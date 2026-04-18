@@ -5,6 +5,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { CheckIf, stripAngleBrackets } from "../src/checkif";
+import { isTwitterUrl, toTwitterProxyUrl } from "../src/providers/twitter";
 
 describe("stripAngleBrackets", () => {
 	test("strips angle brackets from autolink URL", () => {
@@ -114,73 +115,73 @@ describe("CheckIf.isLinkedUrl", () => {
 	});
 });
 
-describe("CheckIf.isTwitterUrl", () => {
+describe("isTwitterUrl", () => {
 	test("returns true for twitter.com", () => {
-		expect(CheckIf.isTwitterUrl("https://twitter.com/user/status/123")).toBe(true);
+		expect(isTwitterUrl("https://twitter.com/user/status/123")).toBe(true);
 	});
 
 	test("returns true for www.twitter.com", () => {
-		expect(CheckIf.isTwitterUrl("https://www.twitter.com/user/status/123")).toBe(true);
+		expect(isTwitterUrl("https://www.twitter.com/user/status/123")).toBe(true);
 	});
 
 	test("returns true for x.com", () => {
-		expect(CheckIf.isTwitterUrl("https://x.com/user/status/123")).toBe(true);
+		expect(isTwitterUrl("https://x.com/user/status/123")).toBe(true);
 	});
 
 	test("returns true for www.x.com", () => {
-		expect(CheckIf.isTwitterUrl("https://www.x.com/user/status/123")).toBe(true);
+		expect(isTwitterUrl("https://www.x.com/user/status/123")).toBe(true);
 	});
 
 	test("returns false for other domains", () => {
-		expect(CheckIf.isTwitterUrl("https://example.com")).toBe(false);
+		expect(isTwitterUrl("https://example.com")).toBe(false);
 	});
 
 	test("returns false for similar but different domains", () => {
-		expect(CheckIf.isTwitterUrl("https://nottwitter.com")).toBe(false);
-		expect(CheckIf.isTwitterUrl("https://twitter.org")).toBe(false);
+		expect(isTwitterUrl("https://nottwitter.com")).toBe(false);
+		expect(isTwitterUrl("https://twitter.org")).toBe(false);
 	});
 
 	test("returns false for invalid URL", () => {
-		expect(CheckIf.isTwitterUrl("not a url")).toBe(false);
+		expect(isTwitterUrl("not a url")).toBe(false);
 	});
 });
 
-describe("CheckIf.toTwitterProxyUrl", () => {
+describe("toTwitterProxyUrl", () => {
 	test("converts twitter.com to fxtwitter.com", () => {
-		expect(CheckIf.toTwitterProxyUrl("https://twitter.com/user/status/123")).toBe(
+		expect(toTwitterProxyUrl("https://twitter.com/user/status/123")).toBe(
 			"https://fxtwitter.com/user/status/123",
 		);
 	});
 
 	test("converts www.twitter.com to fxtwitter.com", () => {
-		expect(CheckIf.toTwitterProxyUrl("https://www.twitter.com/user/status/123")).toBe(
+		expect(toTwitterProxyUrl("https://www.twitter.com/user/status/123")).toBe(
 			"https://fxtwitter.com/user/status/123",
 		);
 	});
 
 	test("converts x.com to fixupx.com", () => {
-		expect(CheckIf.toTwitterProxyUrl("https://x.com/user/status/123")).toBe(
+		expect(toTwitterProxyUrl("https://x.com/user/status/123")).toBe(
 			"https://fixupx.com/user/status/123",
 		);
 	});
 
 	test("converts www.x.com to fixupx.com", () => {
-		expect(CheckIf.toTwitterProxyUrl("https://www.x.com/user/status/123")).toBe(
+		expect(toTwitterProxyUrl("https://www.x.com/user/status/123")).toBe(
 			"https://fixupx.com/user/status/123",
 		);
 	});
 
 	test("returns original URL for non-Twitter domains", () => {
-		expect(CheckIf.toTwitterProxyUrl("https://example.com")).toBe("https://example.com");
+		expect(toTwitterProxyUrl("https://example.com")).toBe("https://example.com");
 	});
 
 	test("preserves path and query parameters", () => {
-		expect(CheckIf.toTwitterProxyUrl("https://twitter.com/user/status/123?s=20")).toBe(
+		expect(toTwitterProxyUrl("https://twitter.com/user/status/123?s=20")).toBe(
 			"https://fxtwitter.com/user/status/123?s=20",
 		);
 	});
 
 	test("returns original for invalid URL", () => {
-		expect(CheckIf.toTwitterProxyUrl("not a url")).toBe("not a url");
+		expect(toTwitterProxyUrl("not a url")).toBe("not a url");
 	});
 });

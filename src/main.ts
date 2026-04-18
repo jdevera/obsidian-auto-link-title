@@ -6,15 +6,16 @@
 import { type Editor, Notice, Plugin } from "obsidian";
 import {
 	type AutoLinkTitleApi,
-	DEFAULT_HANDLER_TIMEOUT_MS,
-	isValidHandlerId,
-	type TitleHandler,
-	type TitleHandlerInfo,
+	DEFAULT_PROVIDER_TIMEOUT_MS,
+	isValidProviderId,
+	type TitleProvider,
+	type TitleProviderInfo,
 	withTimeout,
 } from "./api";
 import { CheckIf, stripAngleBrackets } from "./checkif";
 import { EditorExtensions } from "./editor-enhancements";
 import { i18n } from "./lang/i18n";
+import { createTwitterProvider } from "./providers/twitter";
 import { type AutoLinkTitleSettings, AutoLinkTitleSettingTab, DEFAULT_SETTINGS } from "./settings";
 import { fetchUrlTitle } from "./title-fetcher";
 import { escapeMarkdown, getUrlFromLink, shortTitle } from "./utils/markdown";
@@ -36,35 +37,36 @@ export default class AutoLinkTitle extends Plugin {
 	dropFunction: DropFunction;
 	blacklist: Array<string>;
 
-	/** Live registry of externally-registered title handlers, keyed by id */
-	titleHandlers: Map<string, TitleHandler> = new Map();
+	/** Live registry of externally-registered title providers, keyed by id */
+	titleProviders: Map<string, TitleProvider> = new Map();
 
 	/** Public API exposed on the plugin instance for external callers */
 	api: AutoLinkTitleApi = {
-		registerTitleHandler: (handler: TitleHandler): (() => void) => {
-			if (!isValidHandlerId(handler.id)) {
+		registerTitleProvider: (provider: TitleProvider): (() => void) => {
+			if (!isValidProviderId(provider.id)) {
 				throw new Error(
-					`Invalid title handler id "${handler.id}": must be lowercase alphanumeric with optional dashes`,
+					`Invalid title provider id "${provider.id}": must be lowercase alphanumeric with optional dashes`,
 				);
 			}
-			this.titleHandlers.set(handler.id, handler);
-			if (!this.settings.titleHandlerOrder.includes(handler.id)) {
-				this.settings.titleHandlerOrder.push(handler.id);
+			this.titleProviders.set(provider.id, provider);
+			if (!this.settings.titleProviderOrder.includes(provider.id)) {
+				this.settings.titleProviderOrder.push(provider.id);
 				void this.saveSettings();
 			}
-			return () => this.api.unregisterTitleHandler(handler.id);
+			return () => this.api.unregisterTitleProvider(provider.id);
 		},
-		unregisterTitleHandler: (id: string): void => {
-			this.titleHandlers.delete(id);
+		unregisterTitleProvider: (id: string): void => {
+			this.titleProviders.delete(id);
 		},
-		listHandlers: (): TitleHandlerInfo[] => {
-			const disabled = new Set(this.settings.titleHandlerDisabled);
-			return this.settings.titleHandlerOrder.map((id) => {
-				const handler = this.titleHandlers.get(id);
+		listProviders: (): TitleProviderInfo[] => {
+			const disabled = new Set(this.settings.titleProviderDisabled);
+			return this.settings.titleProviderOrder.map((id) => {
+				const provider = this.titleProviders.get(id);
 				return {
 					id,
-					label: handler?.label,
-					registered: handler !== undefined,
+					label: provider?.label,
+					origin: provider?.origin,
+					registered: provider !== undefined,
 					enabled: !disabled.has(id),
 				};
 			});
@@ -72,47 +74,47 @@ export default class AutoLinkTitle extends Plugin {
 	};
 
 	/**
-	 * Walks the user-configured handler order and returns the first title
-	 * produced by a matching, registered, enabled handler. Returns null if
-	 * nothing matched or every matching handler errored or timed out.
+	 * Walks the user-configured provider order and returns the first title
+	 * produced by a matching, registered, enabled provider. Returns null if
+	 * nothing matched or every matching provider errored or timed out.
 	 */
-	async tryRegisteredHandlers(url: string): Promise<string | null> {
-		const disabled = new Set(this.settings.titleHandlerDisabled);
-		for (const id of this.settings.titleHandlerOrder) {
+	async tryRegisteredProviders(url: string): Promise<string | null> {
+		const disabled = new Set(this.settings.titleProviderDisabled);
+		for (const id of this.settings.titleProviderOrder) {
 			if (disabled.has(id)) continue;
-			const handler = this.titleHandlers.get(id);
-			if (!handler) continue;
+			const provider = this.titleProviders.get(id);
+			if (!provider) continue;
 			let matches: boolean;
 			try {
-				matches = handler.match(url);
+				matches = provider.match(url);
 			} catch (err) {
-				console.error(`[auto-link-title] handler "${id}" match() threw`, err);
+				console.error(`[auto-link-title] provider "${id}" match() threw`, err);
 				continue;
 			}
 			if (!matches) continue;
 			try {
-				const title = await withTimeout(handler.fetch(url), DEFAULT_HANDLER_TIMEOUT_MS);
+				const title = await withTimeout(provider.fetch(url), DEFAULT_PROVIDER_TIMEOUT_MS);
 				if (title && title.trim().length > 0) {
 					return title.trim();
 				}
 			} catch (err) {
-				console.error(`[auto-link-title] handler "${id}" fetch() failed`, err);
+				console.error(`[auto-link-title] provider "${id}" fetch() failed`, err);
 			}
 		}
 		return null;
 	}
 
 	/**
-	 * Drops handler ids from settings.titleHandlerOrder that are not in the
-	 * live registry after all plugins have had a chance to call registerTitleHandler.
+	 * Drops provider ids from settings.titleProviderOrder that are not in the
+	 * live registry after all plugins have had a chance to call registerTitleProvider.
 	 */
-	async sweepUnknownHandlers(): Promise<void> {
-		const before = this.settings.titleHandlerOrder;
-		const after = before.filter((id) => this.titleHandlers.has(id));
+	async sweepUnknownProviders(): Promise<void> {
+		const before = this.settings.titleProviderOrder;
+		const after = before.filter((id) => this.titleProviders.has(id));
 		if (after.length !== before.length) {
-			this.settings.titleHandlerOrder = after;
-			this.settings.titleHandlerDisabled = this.settings.titleHandlerDisabled.filter((id) =>
-				this.titleHandlers.has(id),
+			this.settings.titleProviderOrder = after;
+			this.settings.titleProviderDisabled = this.settings.titleProviderDisabled.filter((id) =>
+				this.titleProviders.has(id),
 			);
 			await this.saveSettings();
 		}
@@ -168,13 +170,16 @@ export default class AutoLinkTitle extends Plugin {
 			],
 		});
 
+		// Register built-in providers before any external script can depend on them.
+		this.api.registerTitleProvider(createTwitterProvider());
+
 		this.addSettingTab(new AutoLinkTitleSettingTab(this.app, this));
 
-		// Sweep handler ids that are in settings but nobody has registered by the
+		// Sweep provider ids that are in settings but nobody has registered by the
 		// time Obsidian has finished loading. onLayoutReady fires after every
 		// enabled plugin's onload has run.
 		this.app.workspace.onLayoutReady(() => {
-			void this.sweepUnknownHandlers();
+			void this.sweepUnknownProviders();
 		});
 	}
 
@@ -380,9 +385,9 @@ export default class AutoLinkTitle extends Plugin {
 		// Instantly paste so you don't wonder if paste is broken
 		editor.replaceSelection(`[${pasteId}](${url})`);
 
-		// Try externally-registered handlers first (Todoist, Twist, etc.),
-		// then fall back to the built-in LinkPreview and scraper chain.
-		let title = await this.tryRegisteredHandlers(url);
+		// Try externally-registered providers first, then fall back to the
+		// built-in LinkPreview and scraper chain.
+		let title = await this.tryRegisteredProviders(url);
 		if (title === null) {
 			const linkPreviewApiKey = this.settings.linkPreviewSecretId
 				? (this.app.secretStorage.getSecret(this.settings.linkPreviewSecretId) ?? "")
@@ -413,9 +418,15 @@ export default class AutoLinkTitle extends Plugin {
 	/** Loads plugin settings from Obsidian's data store */
 	async loadSettings() {
 		const loaded = (await this.loadData()) as
-			| (AutoLinkTitleSettings & { linkPreviewApiKey?: string })
+			| (AutoLinkTitleSettings & {
+					linkPreviewApiKey?: string;
+					useTwitterProxy?: boolean;
+					titleHandlerOrder?: string[];
+					titleHandlerDisabled?: string[];
+			  })
 			| null;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
+		let shouldSave = false;
 
 		// Migrate the legacy plaintext `linkPreviewApiKey` setting into Obsidian's
 		// SecretStorage. The key moves out of data.json and the setting now holds
@@ -426,8 +437,46 @@ export default class AutoLinkTitle extends Plugin {
 			this.app.secretStorage.setSecret(migratedId, legacyKey);
 			this.settings.linkPreviewSecretId = migratedId;
 			(this.settings as { linkPreviewApiKey?: string }).linkPreviewApiKey = undefined;
-			await this.saveSettings();
+			shouldSave = true;
 		}
+
+		// Migrate the earlier "handlers" naming to "providers". If a user's
+		// data.json was written under the previous name, carry the ordering and
+		// disabled list across, then drop the old keys.
+		if (loaded?.titleHandlerOrder && this.settings.titleProviderOrder.length === 0) {
+			this.settings.titleProviderOrder = [...loaded.titleHandlerOrder];
+			shouldSave = true;
+		}
+		if (loaded?.titleHandlerDisabled && this.settings.titleProviderDisabled.length === 0) {
+			this.settings.titleProviderDisabled = [...loaded.titleHandlerDisabled];
+			shouldSave = true;
+		}
+		if (loaded && Object.hasOwn(loaded, "titleHandlerOrder")) {
+			(this.settings as { titleHandlerOrder?: string[] }).titleHandlerOrder = undefined;
+			shouldSave = true;
+		}
+		if (loaded && Object.hasOwn(loaded, "titleHandlerDisabled")) {
+			(this.settings as { titleHandlerDisabled?: string[] }).titleHandlerDisabled = undefined;
+			shouldSave = true;
+		}
+
+		// Migrate the legacy boolean `useTwitterProxy` setting into the generic
+		// title-provider enable/disable list. The Twitter provider is now
+		// registered via the plugin API like any other, so a disabled legacy
+		// toggle translates to disabling the "twitter" provider by id.
+		if (
+			loaded?.useTwitterProxy === false &&
+			!this.settings.titleProviderDisabled.includes("twitter")
+		) {
+			this.settings.titleProviderDisabled = [...this.settings.titleProviderDisabled, "twitter"];
+			shouldSave = true;
+		}
+		if (loaded && Object.hasOwn(loaded, "useTwitterProxy")) {
+			(this.settings as { useTwitterProxy?: boolean }).useTwitterProxy = undefined;
+			shouldSave = true;
+		}
+
+		if (shouldSave) await this.saveSettings();
 	}
 
 	/** Saves plugin settings to Obsidian's data store */

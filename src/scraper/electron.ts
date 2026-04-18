@@ -7,16 +7,8 @@
 const electronPkg = require("electron");
 
 import { request } from "obsidian";
-import { CheckIf } from "../checkif";
 
-import {
-	blank,
-	getOgTitle,
-	getUrlFinalSegment,
-	normalizeUrl,
-	notBlank,
-	prepareTwitterScrape,
-} from "./common";
+import { blank, getOgTitle, getUrlFinalSegment, normalizeUrl, notBlank } from "./common";
 
 /** Default timeout for page loading (10 seconds) */
 const LOAD_TIMEOUT_MS = 10000;
@@ -118,14 +110,11 @@ async function electronGetPageTitle(url: string): Promise<string> {
 /**
  * Fetches page title using simple HTTP request (fallback for non-Electron)
  * @param url - URL to fetch title from
- * @param useTwitterProxy - Whether to use Twitter proxy for scraping
  * @returns Page title, URL as fallback, or empty string on error
  */
-async function nonElectronGetPageTitle(url: string, useTwitterProxy: boolean): Promise<string> {
+async function nonElectronGetPageTitle(url: string): Promise<string> {
 	try {
-		const { scrapeUrl, headers } = prepareTwitterScrape(url, useTwitterProxy);
-
-		const html = await request({ url: scrapeUrl, headers });
+		const html = await request({ url });
 
 		const doc = new DOMParser().parseFromString(html, "text/html");
 
@@ -199,16 +188,10 @@ async function tryGetFileType(url: string) {
 /**
  * Fetches page title, using Electron if available, otherwise falls back to HTTP
  * @param url - URL to fetch title from (http/https prefix added if missing)
- * @param useTwitterProxy - Whether to use Twitter proxy for scraping
  * @returns Page title, file name for non-HTML, or error message
  */
-export default async function getPageTitle(url: string, useTwitterProxy: boolean): Promise<string> {
+export default async function getPageTitle(url: string): Promise<string> {
 	url = normalizeUrl(url);
-
-	// For Twitter/X URLs, use HTTP request with proxy if enabled (BrowserWindow won't work well)
-	if (CheckIf.isTwitterUrl(url)) {
-		return nonElectronGetPageTitle(url, useTwitterProxy);
-	}
 
 	// Try to do a HEAD request to see if the site is reachable and if it's an HTML page
 	// If we error out due to CORS, we'll just try to scrape the page anyway.
@@ -220,6 +203,6 @@ export default async function getPageTitle(url: string, useTwitterProxy: boolean
 	if (electronPkg != null) {
 		return electronGetPageTitle(url);
 	} else {
-		return nonElectronGetPageTitle(url, useTwitterProxy);
+		return nonElectronGetPageTitle(url);
 	}
 }

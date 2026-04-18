@@ -13,6 +13,7 @@ globalThis.window = {
 
 // Mock the obsidian module
 mock.module("obsidian", () => ({
+	requestUrl: async () => ({ text: "", headers: {} as Record<string, string> }),
 	Notice: class Notice {},
 	PluginSettingTab: class PluginSettingTab {
 		app: any;

@@ -59,14 +59,10 @@ export default {
 			name: "Ignore Code Blocks",
 			desc: "Don't fetch titles for URLs pasted inside code blocks or inline code (backticks).",
 		},
-		useTwitterProxy: {
-			name: "Use Twitter/X Proxy",
-			desc: "Use fxtwitter.com to fetch titles from Twitter/X URLs. Disable if you don't want proxy conversion.",
-		},
-		titleHandlers: {
-			heading: "Title handlers",
-			desc: "Custom title handlers registered by other plugins or scripts. The first matching enabled handler wins. Handlers not currently registered are shown greyed out but their position is preserved.",
-			empty: "No title handlers registered yet.",
+		titleProviders: {
+			heading: "Title providers",
+			desc: "Custom title providers registered by other plugins or scripts. The first matching enabled provider wins. Providers not currently registered are shown greyed out but their position is preserved.",
+			empty: "No title providers registered yet.",
 			notLoaded: "not currently loaded",
 			moveUp: "Move up",
 			moveDown: "Move down",
