@@ -4,6 +4,14 @@
  * Automatically fetches and inserts titles when pasting or dropping URLs.
  */
 import { type Editor, Notice, Plugin } from "obsidian";
+import {
+	type AutoLinkTitleApi,
+	DEFAULT_HANDLER_TIMEOUT_MS,
+	isValidHandlerId,
+	type TitleHandler,
+	type TitleHandlerInfo,
+	withTimeout,
+} from "./api";
 import { CheckIf, stripAngleBrackets } from "./checkif";
 import { EditorExtensions } from "./editor-enhancements";
 import { i18n } from "./lang/i18n";
@@ -27,6 +35,88 @@ export default class AutoLinkTitle extends Plugin {
 	pasteFunction: PasteFunction;
 	dropFunction: DropFunction;
 	blacklist: Array<string>;
+
+	/** Live registry of externally-registered title handlers, keyed by id */
+	titleHandlers: Map<string, TitleHandler> = new Map();
+
+	/** Public API exposed on the plugin instance for external callers */
+	api: AutoLinkTitleApi = {
+		registerTitleHandler: (handler: TitleHandler): (() => void) => {
+			if (!isValidHandlerId(handler.id)) {
+				throw new Error(
+					`Invalid title handler id "${handler.id}": must be lowercase alphanumeric with optional dashes`,
+				);
+			}
+			this.titleHandlers.set(handler.id, handler);
+			if (!this.settings.titleHandlerOrder.includes(handler.id)) {
+				this.settings.titleHandlerOrder.push(handler.id);
+				void this.saveSettings();
+			}
+			return () => this.api.unregisterTitleHandler(handler.id);
+		},
+		unregisterTitleHandler: (id: string): void => {
+			this.titleHandlers.delete(id);
+		},
+		listHandlers: (): TitleHandlerInfo[] => {
+			const disabled = new Set(this.settings.titleHandlerDisabled);
+			return this.settings.titleHandlerOrder.map((id) => {
+				const handler = this.titleHandlers.get(id);
+				return {
+					id,
+					label: handler?.label,
+					registered: handler !== undefined,
+					enabled: !disabled.has(id),
+				};
+			});
+		},
+	};
+
+	/**
+	 * Walks the user-configured handler order and returns the first title
+	 * produced by a matching, registered, enabled handler. Returns null if
+	 * nothing matched or every matching handler errored or timed out.
+	 */
+	async tryRegisteredHandlers(url: string): Promise<string | null> {
+		const disabled = new Set(this.settings.titleHandlerDisabled);
+		for (const id of this.settings.titleHandlerOrder) {
+			if (disabled.has(id)) continue;
+			const handler = this.titleHandlers.get(id);
+			if (!handler) continue;
+			let matches: boolean;
+			try {
+				matches = handler.match(url);
+			} catch (err) {
+				console.error(`[auto-link-title] handler "${id}" match() threw`, err);
+				continue;
+			}
+			if (!matches) continue;
+			try {
+				const title = await withTimeout(handler.fetch(url), DEFAULT_HANDLER_TIMEOUT_MS);
+				if (title && title.trim().length > 0) {
+					return title.trim();
+				}
+			} catch (err) {
+				console.error(`[auto-link-title] handler "${id}" fetch() failed`, err);
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Drops handler ids from settings.titleHandlerOrder that are not in the
+	 * live registry after all plugins have had a chance to call registerTitleHandler.
+	 */
+	async sweepUnknownHandlers(): Promise<void> {
+		const before = this.settings.titleHandlerOrder;
+		const after = before.filter((id) => this.titleHandlers.has(id));
+		if (after.length !== before.length) {
+			this.settings.titleHandlerOrder = after;
+			this.settings.titleHandlerDisabled = this.settings.titleHandlerDisabled.filter((id) =>
+				this.titleHandlers.has(id),
+			);
+			await this.saveSettings();
+		}
+	}
 
 	async onload() {
 		console.log("loading obsidian-auto-link-title");
@@ -79,6 +169,13 @@ export default class AutoLinkTitle extends Plugin {
 		});
 
 		this.addSettingTab(new AutoLinkTitleSettingTab(this.app, this));
+
+		// Sweep handler ids that are in settings but nobody has registered by the
+		// time Obsidian has finished loading. onLayoutReady fires after every
+		// enabled plugin's onload has run.
+		this.app.workspace.onLayoutReady(() => {
+			void this.sweepUnknownHandlers();
+		});
 	}
 
 	/**
@@ -283,11 +380,15 @@ export default class AutoLinkTitle extends Plugin {
 		// Instantly paste so you don't wonder if paste is broken
 		editor.replaceSelection(`[${pasteId}](${url})`);
 
-		// Fetch title from site, replace Fetching Title with actual title
-		const linkPreviewApiKey = this.settings.linkPreviewSecretId
-			? (this.app.secretStorage.getSecret(this.settings.linkPreviewSecretId) ?? "")
-			: "";
-		const title = await fetchUrlTitle(url, { ...this.settings, linkPreviewApiKey });
+		// Try externally-registered handlers first (Todoist, Twist, etc.),
+		// then fall back to the built-in LinkPreview and scraper chain.
+		let title = await this.tryRegisteredHandlers(url);
+		if (title === null) {
+			const linkPreviewApiKey = this.settings.linkPreviewSecretId
+				? (this.app.secretStorage.getSecret(this.settings.linkPreviewSecretId) ?? "")
+				: "";
+			title = await fetchUrlTitle(url, { ...this.settings, linkPreviewApiKey });
+		}
 		const escapedTitle = escapeMarkdown(title);
 		const shortenedTitle = shortTitle(escapedTitle, this.settings.maximumTitleLength);
 

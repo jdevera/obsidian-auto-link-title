@@ -26,6 +26,10 @@ export interface AutoLinkTitleSettings {
 	useBetterPasteId: boolean;
 	ignoreCodeBlocks: boolean;
 	useTwitterProxy: boolean;
+	/** Ordered list of registered title handler ids (highest priority first) */
+	titleHandlerOrder: string[];
+	/** Title handler ids the user has explicitly disabled */
+	titleHandlerDisabled: string[];
 }
 
 /**
@@ -50,6 +54,8 @@ export const DEFAULT_SETTINGS: AutoLinkTitleSettings = {
 	useBetterPasteId: false,
 	ignoreCodeBlocks: true,
 	useTwitterProxy: true,
+	titleHandlerOrder: [],
+	titleHandlerDisabled: [],
 };
 
 /**
