@@ -18,6 +18,9 @@ Additionally, using `ctrl-shift-e` (Windows) or `cmd-shift-e` (OS X) you can ove
 
 If your text cursor is within `[some plugin](https://github.com/zolrath/obsidian-auto-link-title)` pressing `ctrl+shift+e` fetches the sites title and replaces it, resulting in `[zolrath/obsidian-auto-link-title: Automatically fetch the titles of pasted links](https://github.com/zolrath/obsidian-auto-link-title)`
 
+### Extensibility: Title Providers
+Other plugins or user scripts (CustomJS, RunJS) can register custom title fetchers for URLs behind authentication or for services that expose richer metadata through an API. See [docs/title-providers.md](docs/title-providers.md) for the registration API and a worked example.
+
 ### Mobile Pasting
 In order to paste the URL ensure you perform the `Tap and Hold -> Paste` action to paste the URL into your document.
 
