@@ -3,6 +3,7 @@
  * Utility class for checking URL and markdown link states.
  * Used to determine whether to auto-fetch titles when pasting.
  */
+import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
 import type { Editor } from "obsidian";
 import { DEFAULT_SETTINGS } from "./settings";
 
@@ -91,41 +92,60 @@ export class CheckIf {
 	}
 
 	/**
-	 * Checks if the cursor is inside inline code (backticks) or a code block
+	 * Checks if the cursor is inside inline code or a fenced code block.
+	 *
+	 * Uses CodeMirror's Lezer syntax tree so that escaped backticks and
+	 * multi-backtick inline-code delimiters are handled correctly. Falls back
+	 * to counting fence markers above the cursor when the parser has not yet
+	 * committed an unclosed fence to a `FencedCode` node.
 	 * @param editor - Obsidian editor instance
 	 * @returns true if cursor is inside code formatting
 	 */
 	public static isInsideCode(editor: Editor): boolean {
-		const cursor = editor.getCursor();
-		const line = editor.getLine(cursor.line);
+		// @ts-expect-error - cm is an undocumented but stable EditorView reference
+		const view = editor.cm;
+		if (!view) return false;
+		const pos = view.state.selection.main.head;
+		const tree = ensureSyntaxTree(view.state, view.state.doc.length, 50) ?? syntaxTree(view.state);
+		let found = false;
+		tree.iterate({
+			from: pos,
+			to: pos,
+			enter(n) {
+				if (found) return false;
+				// Obsidian layers HyperMD token classes on top of the Lezer markdown
+				// parser, so node names look like "HyperMD-codeblock_hmd-codeblock" or
+				// "formatting_formatting-code_inline-code". Match substrings of those
+				// class names as well as the bare Lezer markdown node names for views
+				// where the HyperMD layer is absent.
+				const name = n.type.name;
+				if (
+					name.includes("codeblock") ||
+					name.includes("code-block") ||
+					name.includes("inline-code") ||
+					name === "FencedCode" ||
+					name === "CodeBlock" ||
+					name === "InlineCode" ||
+					name === "CodeText"
+				) {
+					found = true;
+				}
+			},
+		});
+		if (found) return true;
 
-		// Check for inline code: count backticks before cursor
-		const textBeforeCursor = line.substring(0, cursor.ch);
-		const backticksBeforeCursor = (textBeforeCursor.match(/`/g) || []).length;
-
-		// If odd number of backticks before cursor, we're inside inline code
-		if (backticksBeforeCursor % 2 === 1) {
-			return true;
-		}
-
-		// Check for code block: look for ``` above without closing ```
-		const content = editor.getValue();
-		const lines = content.split("\n");
-		let inCodeBlock = false;
-
-		for (let i = 0; i < cursor.line; i++) {
-			const trimmed = lines[i].trim();
-			if (trimmed.startsWith("```")) {
-				inCodeBlock = !inCodeBlock;
+		// Fallback: an unclosed fenced block has no closing ``` yet, so the parser
+		// has not committed it to a FencedCode node. Count fence markers on lines
+		// strictly above the cursor line. An odd count means we are inside an open fence.
+		const { doc } = view.state;
+		const cursorLine = doc.lineAt(pos);
+		let fenceMarkers = 0;
+		for (let n = 1; n < cursorLine.number; n++) {
+			if (/^\s{0,3}(`{3,}|~{3,})/.test(doc.line(n).text)) {
+				fenceMarkers++;
 			}
 		}
-
-		// Check if current line starts a code block
-		if (lines[cursor.line].trim().startsWith("```")) {
-			return true;
-		}
-
-		return inCodeBlock;
+		return fenceMarkers % 2 === 1;
 	}
 
 	/**
