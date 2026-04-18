@@ -63,5 +63,13 @@ export default {
 			name: "Use Twitter/X Proxy",
 			desc: "Use fxtwitter.com to fetch titles from Twitter/X URLs. Disable if you don't want proxy conversion.",
 		},
+		titleHandlers: {
+			heading: "Title handlers",
+			desc: "Custom title handlers registered by other plugins or scripts. The first matching enabled handler wins. Handlers not currently registered are shown greyed out but their position is preserved.",
+			empty: "No title handlers registered yet.",
+			notLoaded: "not currently loaded",
+			moveUp: "Move up",
+			moveDown: "Move down",
+		},
 	},
 };

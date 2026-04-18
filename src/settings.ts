@@ -189,5 +189,86 @@ export class AutoLinkTitleSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}),
 			);
+
+		this.renderTitleHandlers(containerEl);
+	}
+
+	/**
+	 * Renders the title handlers section: one row per ordered handler id with
+	 * enable toggle and move up/down buttons. Orphan ids (in settings but not
+	 * currently registered) are shown greyed and kept in place, since the
+	 * sweep at onLayoutReady has already removed ids nobody claims.
+	 */
+	private renderTitleHandlers(containerEl: HTMLElement): void {
+		new Setting(containerEl).setName(i18n.settings.titleHandlers.heading).setHeading();
+
+		const desc = containerEl.createEl("div", { cls: "setting-item-description" });
+		desc.setText(i18n.settings.titleHandlers.desc);
+
+		const order = this.plugin.settings.titleHandlerOrder;
+		if (order.length === 0) {
+			const empty = containerEl.createEl("div", { cls: "setting-item-description" });
+			empty.setText(i18n.settings.titleHandlers.empty);
+			return;
+		}
+
+		const disabled = new Set(this.plugin.settings.titleHandlerDisabled);
+		for (let i = 0; i < order.length; i++) {
+			const id = order[i];
+			const handler = this.plugin.titleHandlers.get(id);
+			const label = handler?.label ?? id;
+			const isRegistered = handler !== undefined;
+
+			const row = new Setting(containerEl).setName(label);
+			if (!isRegistered) {
+				row.setDesc(`${id} (${i18n.settings.titleHandlers.notLoaded})`);
+				row.settingEl.addClass("mod-muted");
+			} else if (handler?.label && handler.label !== id) {
+				row.setDesc(id);
+			}
+
+			row.addToggle((t) =>
+				t.setValue(!disabled.has(id)).onChange(async (enabled) => {
+					const next = new Set(this.plugin.settings.titleHandlerDisabled);
+					if (enabled) {
+						next.delete(id);
+					} else {
+						next.add(id);
+					}
+					this.plugin.settings.titleHandlerDisabled = Array.from(next);
+					await this.plugin.saveSettings();
+				}),
+			);
+
+			const currentIndex = i;
+			row.addExtraButton((btn) =>
+				btn
+					.setIcon("chevron-up")
+					.setTooltip(i18n.settings.titleHandlers.moveUp)
+					.setDisabled(currentIndex === 0)
+					.onClick(async () => {
+						await this.moveHandler(currentIndex, currentIndex - 1);
+					}),
+			);
+			row.addExtraButton((btn) =>
+				btn
+					.setIcon("chevron-down")
+					.setTooltip(i18n.settings.titleHandlers.moveDown)
+					.setDisabled(currentIndex === order.length - 1)
+					.onClick(async () => {
+						await this.moveHandler(currentIndex, currentIndex + 1);
+					}),
+			);
+		}
+	}
+
+	/** Swaps two ids in the handler order list and re-renders the settings tab */
+	private async moveHandler(fromIndex: number, toIndex: number): Promise<void> {
+		const order = [...this.plugin.settings.titleHandlerOrder];
+		const [id] = order.splice(fromIndex, 1);
+		order.splice(toIndex, 0, id);
+		this.plugin.settings.titleHandlerOrder = order;
+		await this.plugin.saveSettings();
+		this.display();
 	}
 }

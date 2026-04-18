@@ -65,6 +65,17 @@ const ja: typeof en = {
 			name: "Twitter/Xプロキシを使用",
 			desc: "Twitter/X URLからタイトルを取得する際にfxtwitter.comを使用する。プロキシ変換が不要な場合は無効にしてください。",
 		},
+		// TODO: translate to Japanese. Falling back to the English strings
+		// for now so the `typeof en` type constraint is satisfied without
+		// shipping machine-translated Japanese.
+		titleHandlers: {
+			heading: "Title handlers",
+			desc: "Custom title handlers registered by other plugins or scripts. The first matching enabled handler wins. Handlers not currently registered are shown greyed out but their position is preserved.",
+			empty: "No title handlers registered yet.",
+			notLoaded: "not currently loaded",
+			moveUp: "Move up",
+			moveDown: "Move down",
+		},
 	},
 };
 
